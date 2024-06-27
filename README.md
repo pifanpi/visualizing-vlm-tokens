@@ -1,7 +1,9 @@
 # image tokens in words
 
+If you're into poetry, run `poetry install`, otherwise:
+
 ```
-poetry install
+pip install -r requirements.txt
 ./imgtokens.py "https://www.mcgawgraphics.com/cdn/shop/products/O360PF_1024x1024.jpg?v=1662584163"
 ```
 
