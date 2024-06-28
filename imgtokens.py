@@ -168,14 +168,15 @@ class ImagePatchWordTokenizer:
         words = self._vectors_to_words(tokens[0], num_words)
         return words
 
-    def draw_with_plotly(self, img: Image.Image, words: list[list[str]], size: int = 1500, jupyter_workaround:bool = True):
+    def draw_with_plotly(self, img: Image.Image, words: list[list[str]], size: int = 1500, iframe:bool = True):
         """Renders the image, and overlays a grid with words in it, in iPython notebook using plotly
-        :param jupyter_workaround: if True, will use an iframe to render plotly
+        :param iframe: if True, will use an iframe to render plotly, which works around a common jupyter problem
         """
         import plotly.express as px
         import pandas as pd
         import plotly.graph_objects as go
-        if jupyter_workaround:
+        if iframe:
+            # A common workaround for jupyter problems
             import plotly.io as pio
             pio.renderers.default='iframe'
 
