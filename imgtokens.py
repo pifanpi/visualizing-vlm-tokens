@@ -89,7 +89,7 @@ class ImagePatchWordTokenizer:
         self.use_4bit = use_4bit
         self.processor = None 
         self.model = None
-        self.line_separator = "\n"
+        self.img = None
 
     def _init_model(self):
         """Lazily load and initialize the model - this takes at least several seconds, and maybe a lot
@@ -110,10 +110,10 @@ class ImagePatchWordTokenizer:
                 self.model_str, cache_dir="", quantization_config=quantization_config
             )
 
-    def _extract_image_features(self, img: Image.Image) -> torch.Tensor:
+    def _extract_image_features(self) -> torch.Tensor:
         self._init_model()
         prompt = "[INST] <image>\nWhat is shown in this image? [/INST]"  # doesn't really matter
-        inputs = self.processor(prompt, img, return_tensors="pt").to("cuda:0")
+        inputs = self.processor(prompt, self.img, return_tensors="pt").to("cuda:0")
         try:
             self.model.generate(**inputs, max_new_tokens=10)
             raise RuntimeError("Should never get here")
@@ -181,11 +181,14 @@ class ImagePatchWordTokenizer:
         img = img.resize((int(img.size[0] * scale), int(img.size[1] * scale)))
         return img
 
-    def render_words_on_image(self, img: Image.Image, words: list[list[str]], size:int=1000) -> Image.Image:
+    def set_image(self, img: Image.Image):
+        self.img = self._standardize_img(img)
+
+    def render_words_on_image(self, words: list[list[str]], size:int=1000) -> Image.Image:
         """Renders the words on the image, in the center of each cell.
         Returns a new image.
         """
-        img = self._standardize_img(img, size)
+        img = self._standardize_img(self.img, size)
         font = ImageFont.load_default()
         draw = ImageDraw.Draw(img)
         grid_size = img.size[0] // len(words), img.size[1] // len(words[0])
@@ -209,12 +212,12 @@ class ImagePatchWordTokenizer:
     def process_img(self, img: Image.Image, num_words: int = 1) -> list[list[str]]:
         """Takes an image, and returns a visualization of the image tokens.
         """
-        img = self._standardize_img(img)
-        tokens = self._extract_image_features(img)
+        self.set_image(img)
+        tokens = self._extract_image_features()
         words = self._vectors_to_words(tokens[0], num_words)
         return words
 
-    def draw_with_plotly(self, img: Image.Image, words: list[list[str]], size: int = 1500, iframe:bool = True):
+    def draw_with_plotly(self, words: list[list[str]], size: int = 1500, iframe:bool = True):
         """Renders the image, and overlays a grid with words in it, in iPython notebook using plotly
         :param iframe: if True, will use an iframe to render plotly, which works around a common jupyter problem
         """
@@ -227,7 +230,7 @@ class ImagePatchWordTokenizer:
             pio.renderers.default='iframe'
 
         # First just draw the image with plotly
-        img = self._standardize_img(img, size=size)
+        img = self._standardize_img(self.img, size=size)
 
         # Plotly likes pandas dataframes, so let's load the words into a dataframe
         data = []
@@ -258,7 +261,7 @@ class ImagePatchWordTokenizer:
         fig.show()
 
 
-def process_image_cli(img_url: str, num_words: int = 1, size: int = 1000, save_to: str = None):
+def process_image_cli(img_url: str, num_words: int = 1, size: int = 1000, save_img: str = None, save_words: str = None):
     if img_url.startswith("http"):
         print(f"Fetching img from {img_url}")
         response = requests.get(img_url)
@@ -269,17 +272,19 @@ def process_image_cli(img_url: str, num_words: int = 1, size: int = 1000, save_t
     imgcat(img)
     print(f"Initializing model...")
     ipwt = ImagePatchWordTokenizer()
-    img = ipwt._standardize_img(img)
-    print("Extracting image tokens...")
-    tokens = ipwt._extract_image_features(img)
-    print(f"I got {tokens.shape} tokens")
-    words = ipwt._vectors_to_words(tokens[0], num_words)
+    print("Processing image...")
+    words = ipwt.process_img(img, num_words)
+    if save_words:
+        words_serializable = [[str(w) for w in row] for row in words]
+        with open(save_words, "w") as f:
+            json.dump(words_serializable, f)
+        print(f"Saved words to {save_words}")
     # render the words
-    rendered = ipwt.render_words_on_image(img, words, size)
+    rendered = ipwt.render_words_on_image(words, size)
     imgcat(rendered, pixels_per_line=16)
-    if save_to is not None:
-        rendered.save(save_to, quality=95)
-        print(f"Saved image to {save_to}")
+    if save_img is not None:
+        rendered.save(save_img, quality=95)
+        print(f"Saved image to {save_img}")
 
 
 if __name__ == "__main__":
@@ -287,7 +292,8 @@ if __name__ == "__main__":
     parser.add_argument("img_url", type=str, help="URL or local path of the image to process")
     parser.add_argument("--num-words", type=int, default=1, help="Number of words to display per token")
     parser.add_argument("--size", type=int, default=1000, help="Size to standardize the image to")
-    parser.add_argument("--save-to", type=str, default=None, help="Path to save the image to")
+    parser.add_argument("--save-img", type=str, default=None, help="Path to save the image to")
+    parser.add_argument("--save-words", type=str, default=None, help="Path to save the words to")
     args = parser.parse_args()
-    process_image_cli(args.img_url, args.num_words, args.size, args.save_to)
+    process_image_cli(args.img_url, args.num_words, args.size, args.save_img, args.save_words)
 
