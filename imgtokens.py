@@ -65,7 +65,10 @@ class WordList:
         html = "<br>".join(self.words)
         return html
 
-    def __str__(self):
+    def first(self) -> str:
+        return self.words[0]
+
+    def __str__(self) -> str:
         return "\n".join(self.words)
 
 
@@ -236,8 +239,8 @@ class ImagePatchWordTokenizer:
                     # Add 0.5 to put it in the center of each cell
                     "x": (j + 0.5) * width_unit,
                     "y": (i + 0.5) * height_unit,
-                    "firstword": word.split(self.line_separator)[0],
-                    "words": WordRenderHelper.render_html(word),
+                    "firstword": word.first(),
+                    "words": word.as_html(),
                     "font": dict(color="black", size=16)
                 })
         df = pd.DataFrame(data)
