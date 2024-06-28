@@ -1,11 +1,12 @@
-#!/usr/bin/env -S poetry run python
+#!/usr/bin/env python
 
 from io import BytesIO
 
 from PIL import Image
 from PIL import ImageDraw, ImageFont
 from imgcat import imgcat
-from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration, LlamaTokenizer
+from transformers import BitsAndBytesConfig
+from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
 import argparse
 import requests
 import torch
@@ -52,7 +53,13 @@ class ImagePatchWordTokenizer:
             self.processor = LlavaNextProcessor.from_pretrained(self.model_str, torch_dtype=torch.float16)
             self.processor.tokenizer.padding_side = "left"
         if self.model is None:
-            self.model = HackedLlavaNextReturnsImageTokens.from_pretrained(self.model_str, cache_dir = '', device_map='auto')
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16
+            )
+            self.model = HackedLlavaNextReturnsImageTokens.from_pretrained(
+                self.model_str, cache_dir="", quantization_config=quantization_config
+            )
 
     def _extract_image_features(self, img: Image.Image) -> torch.Tensor:
         self._init_model()

@@ -12,3 +12,4 @@ sentencepiece==0.2.0
 protobuf==5.27.2
 plotly==5.22.0
 imgcat==0.5.0
+bitsandbytes==0.43.1
