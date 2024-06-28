@@ -1,7 +1,7 @@
 # image tokens in words
 
 ```
-./install-req.sh
+./install-requirements.sh
 ./imgtokens.py "https://www.mcgawgraphics.com/cdn/shop/products/O360PF_1024x1024.jpg?v=1662584163"
 ```
 

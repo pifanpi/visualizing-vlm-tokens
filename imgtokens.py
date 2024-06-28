@@ -34,13 +34,14 @@ class ImagePatchWordTokenizer:
     with plotly.
     """
 
-    def __init__(self, model_name:str = "llava-hf/llava-v1.6-vicuna-7b-hf"):
+    def __init__(self, model_name:str = "llava-hf/llava-v1.6-vicuna-7b-hf", use_4bit:bool = True):
         """model_name is the name of the model to use.  
             Options known to work are:
                 llava-hf/llava-v1.6-mistral-7b-hf
                 llava-hf/llava-v1.6-vicuna-7b-hf
         """
         self.model_str = model_name
+        self.use_4bit = use_4bit
         self.processor = None 
         self.model = None
         self.line_separator = "\n"
@@ -53,10 +54,13 @@ class ImagePatchWordTokenizer:
             self.processor = LlavaNextProcessor.from_pretrained(self.model_str, torch_dtype=torch.float16)
             self.processor.tokenizer.padding_side = "left"
         if self.model is None:
-            quantization_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16
-            )
+            if self.use_4bit:
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.float16
+                )
+            else:
+                quantization_config = None
             self.model = HackedLlavaNextReturnsImageTokens.from_pretrained(
                 self.model_str, cache_dir="", quantization_config=quantization_config
             )
@@ -164,15 +168,16 @@ class ImagePatchWordTokenizer:
         words = self._vectors_to_words(tokens[0], num_words)
         return words
 
-    def draw_with_plotly(self, img: Image.Image, words: list[list[str]], size: int = 1500):
+    def draw_with_plotly(self, img: Image.Image, words: list[list[str]], size: int = 1500, jupyter_workaround:bool = True):
         """Renders the image, and overlays a grid with words in it, in iPython notebook using plotly
+        :param jupyter_workaround: if True, will use an iframe to render plotly
         """
         import plotly.express as px
         import pandas as pd
         import plotly.graph_objects as go
-        # Workaround for jupyter issues
-        import plotly.io as pio
-        pio.renderers.default='iframe'
+        if jupyter_workaround:
+            import plotly.io as pio
+            pio.renderers.default='iframe'
 
         # First just draw the image with plotly
         img = self._standardize_img(img, size=size)
