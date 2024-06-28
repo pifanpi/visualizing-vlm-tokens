@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-
 from io import BytesIO
+import json
+from functools import lru_cache
 
 from PIL import Image
 from PIL import ImageDraw, ImageFont
@@ -25,6 +26,47 @@ class HackedLlavaNextReturnsImageTokens(LlavaNextForConditionalGeneration):
     """
     def pack_image_features(self, image_features, image_sizes, image_newline=None):
         raise BailOutWithData(image_features[0])
+
+class XiaoDict:
+    """Small chinese dictionary
+    """
+
+    def __init__(self, filename: str = "cedict-top.json"):
+        with open(filename, "r", encoding="utf-8") as f:
+            self.dict = json.load(f)
+
+    def augment(self, word: str) -> str:
+        """Augments a word by adding a definition if it's in the dictionary.
+        e.g. "天" -> "天 (sky)"
+        """
+        if word in self.dict:
+            defn = self.dict[word]
+            return f"{word} ({defn})"
+        else:
+            return word
+
+XIAODICT = XiaoDict()
+
+
+class WordList:
+    """Represents all the words in a single token, and provides methods to render them.
+    """
+
+    def __init__(self):
+        self.words = []
+
+    def append(self, word: str):
+        augmented = XIAODICT.augment(word)
+        self.words.append(augmented)
+
+    def as_html(self) -> str:
+        """Renders the words as HTML for a plotly tooltip
+        """
+        html = "<br>".join(self.words)
+        return html
+
+    def __str__(self):
+        return "\n".join(self.words)
 
 
 class ImagePatchWordTokenizer:
@@ -77,7 +119,7 @@ class ImagePatchWordTokenizer:
             assert isinstance(data, torch.Tensor), f"Expected a tensor, got {type(data)}"
             return data
 
-    def _vectors_to_words(self, output_vectors: torch.Tensor, num_words: int = 1) -> list[list[str]]:
+    def _vectors_to_words(self, output_vectors: torch.Tensor, num_words: int = 1) -> list[list[WordList]]:
         """Takes the output_vectors and converts them to a list of lists of strings.
         The list of lists represents the geometry of the image tokens.
         Each string is the num_words closest word-pieces in the vocabulary.
@@ -102,10 +144,10 @@ class ImagePatchWordTokenizer:
             line = []
             for j in range(edge):
                 idx = i*edge + j
-                entry = []
+                entry = WordList()
                 for k in range(num_words):
                     entry.append(self.processor.tokenizer.decode(k_closest[idx][k]))
-                line.append(self.line_separator.join(entry))
+                line.append(entry)
             out.append(line)
         return out
 
@@ -145,19 +187,20 @@ class ImagePatchWordTokenizer:
         draw = ImageDraw.Draw(img)
         grid_size = img.size[0] // len(words), img.size[1] // len(words[0])
         for i, row in enumerate(words):
-            for j, word in enumerate(row):
+            for j, wordlist in enumerate(row):
+                text = str(wordlist)
                 # Calculate the position to draw the text
                 x = j * grid_size[0]
                 y = i * grid_size[1]
                 # Calculate the position to draw the text in the middle of the cell
-                text_bbox = draw.textbbox((0, 0), word, font=font)
+                text_bbox = draw.textbbox((0, 0), text, font=font)
                 text_width = text_bbox[2] - text_bbox[0]
                 text_height = text_bbox[3] - text_bbox[1]
                 text_x = x + (grid_size[0] - text_width) / 2
                 text_y = y + (grid_size[1] - text_height) / 2
                 # Draw the text
                 text_color = self._opposing_color_near(img, x, y, grid_size[0] // 2)
-                draw.text((text_x, text_y), word, font=font, fill=text_color)
+                draw.text((text_x, text_y), text, font=font, fill=text_color)
         return img
 
     def process_img(self, img: Image.Image, num_words: int = 1) -> list[list[str]]:
@@ -194,7 +237,7 @@ class ImagePatchWordTokenizer:
                     "x": (j + 0.5) * width_unit,
                     "y": (i + 0.5) * height_unit,
                     "firstword": word.split(self.line_separator)[0],
-                    "words": word.replace(self.line_separator, "<br>"),
+                    "words": WordRenderHelper.render_html(word),
                     "font": dict(color="black", size=16)
                 })
         df = pd.DataFrame(data)
