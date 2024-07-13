@@ -217,9 +217,13 @@ class ImagePatchWordTokenizer:
         words = self._vectors_to_words(tokens[0], num_words)
         return words
 
-    def draw_with_plotly(self, words: list[list[str]], size: int = 1500, iframe:bool = True):
+    def draw_with_plotly(self, words: list[list[str]], size: int = 1500, iframe:bool = True, show_plot:bool = True):
         """Renders the image, and overlays a grid with words in it, in iPython notebook using plotly
+        :param words: the word list returned by process_img
+        :param size: the size of the image to render
         :param iframe: if True, will use an iframe to render plotly, which works around a common jupyter problem
+        :param show_plot: if True, will show the plot in a popup window
+        :returns: a plotly figure
         """
         import plotly.express as px
         import pandas as pd
@@ -248,7 +252,7 @@ class ImagePatchWordTokenizer:
                 })
         df = pd.DataFrame(data)
 
-        fig = px.imshow(img, width=img.width, height=img.height)
+        fig = px.imshow(img, width=img.width, height=img.height, binary_format="jpg")
         fig.add_trace(go.Scatter(
             x=df["x"], 
             y=df["y"], 
@@ -258,7 +262,9 @@ class ImagePatchWordTokenizer:
             textposition="bottom center",
             hoverinfo="text", # prevents pixel coordinates from showing up in hover
         ))
-        fig.show()
+        if show_plot:
+            fig.show()
+        return fig
 
 
 def process_image_cli(img_url: str, num_words: int = 1, size: int = 1000, save_img: str = None, save_words: str = None):
