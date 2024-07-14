@@ -13,7 +13,7 @@ import requests
 import torch
 import torch.nn.functional as F
 
-import vecmath
+from similarvec import SimilarityEngine
 
 class BailOutWithData(RuntimeError):
     """A glorious hack!  This lets you bail out in the middle of somebody else's code 
@@ -59,18 +59,25 @@ class WordList:
     def __init__(self):
         self.words = []
         self.strengths = []
+        self.token_ids = []
 
-    def append(self, word: str, strength: float = 1.0):
+    def append(self, word: str, strength: float = 1.0, token_id: int):
         """Add another word-piece to the list.
         """
         augmented = XIAODICT.augment(word)
         self.words.append(augmented)
         self.strengths.append(strength)
+        self.token_ids.append(token_id)
 
     def as_html(self) -> str:
         """Renders the words as HTML for a plotly tooltip
         """
-        html = "<br>".join(f"{w} ({s:.3f})" for w, s in zip(self.words, self.strengths))
+        html = ""
+        for word, strength, tokid in zip(self.words, self.strengths, self.token_ids):
+            word_str = str(word)
+            if len(word_str) == 0:
+                word_str = f"<blank token {tokid}>"
+            html += f"{word_str} ({strength:.4f})<br>"
         return html
 
     def first(self) -> str:
@@ -87,17 +94,16 @@ class ImagePatchWordTokenizer:
     with plotly.
     """
 
-    def __init__(self, model_name:str = "llava-hf/llava-v1.6-vicuna-7b-hf", use_4bit:bool = True, similarity:str="dot"):
+    def __init__(self, model_name:str = "llava-hf/llava-v1.6-vicuna-7b-hf", use_4bit:bool = True):
         """
         :arg model_name: is the name of the model to use.  
             Options known to work are:
                 llava-hf/llava-v1.6-mistral-7b-hf
                 llava-hf/llava-v1.6-vicuna-7b-hf
-        :arg similarity: is the similarity metric to use.  Can be "dot", "cosine", or "l2".
         """
         self.model_str = model_name
         self.use_4bit = use_4bit
-        self.similarity = similarity
+        self.sim_engine = None
         self.processor = None 
         self.model = None
         self.img = None
@@ -106,20 +112,26 @@ class ImagePatchWordTokenizer:
         """Lazily load and initialize the model - this takes at least several seconds, and maybe a lot
         longer if it's not downloaded.  Useful in a notebook to do this lazily.
         """
-        if self.processor is None:
-            self.processor = LlavaNextProcessor.from_pretrained(self.model_str, torch_dtype=torch.float16)
-            self.processor.tokenizer.padding_side = "left"
-        if self.model is None:
-            if self.use_4bit:
-                quantization_config = BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_compute_dtype=torch.float16
-                )
-            else:
-                quantization_config = None
-            self.model = HackedLlavaNextReturnsImageTokens.from_pretrained(
-                self.model_str, cache_dir="", quantization_config=quantization_config
+        if self.model is not None:
+            return  # We've already initialized
+        if self.use_4bit:
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.float16
             )
+        else:
+            quantization_config = None
+        self.model = HackedLlavaNextReturnsImageTokens.from_pretrained(
+            self.model_str, cache_dir="", quantization_config=quantization_config
+        )
+        self.processor = LlavaNextProcessor.from_pretrained(self.model_str, torch_dtype=torch.float16)
+        self.processor.tokenizer.padding_side = "left"
+
+        #embedding_matrix = self.model.get_output_embeddings().weight
+        # ^^ returns a strangely empty object which seems like it's all zeros.
+        embedding_matrix = self.model.language_model.model.embed_tokens.weight  # <vocab, dim>
+        self.embedding_matrix = self.model.language_model.model.embed_tokens.weight  # <vocab, dim>
+        self.sim_engine = SimilarityEngine(self.embedding_matrix)
 
     def _extract_image_features(self) -> torch.Tensor:
         self._init_model()
@@ -133,44 +145,28 @@ class ImagePatchWordTokenizer:
             assert isinstance(data, torch.Tensor), f"Expected a tensor, got {type(data)}"
             return data
 
-    def _closest_wordpieces(self, output_vectors: torch.Tensor, k: int = 1) -> tuple[torch.Tensor, torch.Tensor]:
-        """Finds the k closest word-pieces to the output vectors.  Returns the indices and strengths.
+    def _closest_wordpieces(self, img_tokens: torch.Tensor, k: int = 1, similarity: str = "omp") -> tuple[torch.Tensor, torch.Tensor]:
+        """Finds the k closest word-pieces to the image token vectors (which are output of the vision tower).  
+        Returns a tuple of indices and strengths.
         """
-        # Now we have a bunch of predicted tokens, in vector (embedding) space.
-        # To convert them to token-Ids, we dot them against the embedding matrix.
-        #embedding_matrix = self.model.get_output_embeddings().weight
-        # ^^ returns a strangely empty object which seems like it's all zeros.
-        embedding_matrix = self.model.language_model.model.embed_tokens.weight  # <vocab, dim>
-        # embedding_matrix is shape <vocab, dim>
-        # output_vectors is shape <tok, dim>
-
-        if self.similarity == "dot":
-            similarity_matrix = torch.matmul(output_vectors, embedding_matrix.T)  # <tok, vocab>
-            invert = 1
-        elif self.similarity == "cosine":
-            similarity_matrix = vecmath.all_to_all_cosine_similarity(output_vectors, embedding_matrix)
-            invert = 1
-        elif self.similarity == "l2":
-            similarity_matrix = vecmath.all_to_all_l2_distance(output_vectors, embedding_matrix)
-            invert = -1  # these are distances, so we want to sort for small values
-        else:
-            raise ValueError(f"Unknown similarity metric: {self.similarity}")
-        k_closest = torch.topk(similarity_matrix * invert, k=k, dim=-1).indices  # <tok, k>
+        # img_tokens is shape <tok, dim>
+        similarity_matrix = self.sim_engine.similarity_matrix(img_tokens, similarity)  # <tok, vocab>
+        k_closest = torch.topk(similarity_matrix, k=k, dim=-1).indices  # <tok, k>
         strengths = torch.gather(similarity_matrix, 1, k_closest)  # <tok, k>
         return k_closest, strengths
 
-    def _vectors_to_words(self, output_vectors: torch.Tensor, num_words: int = 1) -> list[list[WordList]]:
-        """Takes the output_vectors and converts them to a list of lists of strings.
+    def _vectors_to_words(self, img_tokens: torch.Tensor, num_words: int = 1, similarity: str = "omp") -> list[list[WordList]]:
+        """Takes the img_tokens and converts them to a list of lists of strings.
         The list of lists represents the geometry of the image tokens.
         Each string is the num_words closest word-pieces in the vocabulary.
         """
         self._init_model()
-        assert output_vectors.ndim == 2, f"Expect <tok, dim> shaped tensor, but got {output_vectors.shape}"
-        numtok = output_vectors.shape[0]
+        assert img_tokens.ndim == 2, f"Expect <tok, dim> shaped tensor, but got {img_tokens.shape}"
+        numtok = img_tokens.shape[0]
         edge = int(numtok ** 0.5)
         assert edge ** 2 == numtok, f"Expected a perfect square-lengthed number of tokens (e.g. 576=24^2), but got {numtok}"
 
-        k_closest, strengths = self._closest_wordpieces(output_vectors, num_words)
+        k_closest, strengths = self._closest_wordpieces(img_tokens, num_words, similarity)
 
         # Now go through it as a square matrix and convert to a list of lists of strings.
         out = []
@@ -180,8 +176,9 @@ class ImagePatchWordTokenizer:
                 idx = i*edge + j
                 entry = WordList()
                 for k in range(num_words):
-                    wordpiece = self.processor.tokenizer.decode(k_closest[idx][k])
-                    entry.append(wordpiece, strengths[idx][k])
+                    tokid = k_closest[idx][k]
+                    wordpiece = self.processor.tokenizer.decode(tokid)
+                    entry.append(wordpiece, strengths[idx][k], tokid)
                 line.append(entry)
             out.append(line)
         return out
@@ -241,12 +238,12 @@ class ImagePatchWordTokenizer:
                 draw.text((text_x, text_y), text, font=font, fill=text_color)
         return img
 
-    def process_img(self, img: Image.Image, num_words: int = 1) -> list[list[str]]:
+    def process_img(self, img: Image.Image, num_words: int = 1, similarity: str = "omp") -> list[list[str]]:
         """Takes an image, and returns a visualization of the image tokens.
         """
         self.set_image(img)
         tokens = self._extract_image_features()
-        words = self._vectors_to_words(tokens[0], num_words)
+        words = self._vectors_to_words(tokens[0], num_words, similarity)
         return words
 
     def draw_with_plotly(self, words: list[list[str]], size: int = 1500, iframe:bool = True) -> "go.Figure":
