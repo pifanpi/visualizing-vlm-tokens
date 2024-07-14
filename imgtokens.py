@@ -56,12 +56,13 @@ class WordList:
     Provides methods to render them.
     """
 
-    def __init__(self):
+    def __init__(self, metric:str):
         self.words = []
         self.strengths = []
         self.token_ids = []
+        self.metric = metric
 
-    def append(self, word: str, strength: float = 1.0, token_id: int):
+    def append(self, word: str, strength: float, token_id: int):
         """Add another word-piece to the list.
         """
         augmented = XIAODICT.augment(word)
@@ -77,7 +78,7 @@ class WordList:
             word_str = str(word)
             if len(word_str) == 0:
                 word_str = f"<blank token {tokid}>"
-            html += f"{word_str} ({strength:.4f})<br>"
+            html += f"{word_str} ({self.metric}: {strength:.3f})<br>"
         return html
 
     def first(self) -> str:
@@ -174,7 +175,7 @@ class ImagePatchWordTokenizer:
             line = []
             for j in range(edge):
                 idx = i*edge + j
-                entry = WordList()
+                entry = WordList(similarity)
                 for k in range(num_words):
                     tokid = k_closest[idx][k]
                     wordpiece = self.processor.tokenizer.decode(tokid)
