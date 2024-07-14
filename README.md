@@ -24,7 +24,7 @@ Warning - this will take a **solid 5 minutes** to load before you can use it.
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pifanpi/visualizing-vlm-tokens/blob/main/run-in-colab.ipynb)
 
-## Run on your own GPU machine
+## Run directly on your own GPU machine
 
 Either from the command line:
 
@@ -40,3 +40,11 @@ Or you can see more than one word per token, and change the output size like:
 ```
 
 Or running the [notebook](Visual-image-tokens.ipynb).
+
+
+## Run inside Docker
+
+```
+docker build -t vlm-token-visualizer .
+docker run -p 8000:8000 vlm-token-visualizer
+```

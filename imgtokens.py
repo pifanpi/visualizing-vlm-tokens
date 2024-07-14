@@ -293,13 +293,34 @@ def process_image_cli(img_url: str, num_words: int = 1, size: int = 1000, save_i
         print(f"Saved image to {save_img}")
 
 
+def preload_models(model_str: str="llava-hf/llava-v1.6-vicuna-7b-hf"):
+    """Preloads the models for the server.
+    """
+    # Note this doesn't seem to work properly for some reason.
+    # The models download and cache appropriately, but
+    # when an IPWT is created it downloads them again itself.
+    print(f"Preloading model {model_str}")
+    HackedLlavaNextReturnsImageTokens.from_pretrained(model_str)
+    print(f"Preloading processor for {model_str}")
+    LlavaNextProcessor.from_pretrained(model_str, torch_dtype=torch.float16)
+    print("Done preloading models.")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process an image and visualize image tokens.")
-    parser.add_argument("img_url", type=str, help="URL or local path of the image to process")
+    parser.add_argument("img_url", type=str, nargs='?', help="URL or local path of the image to process")
     parser.add_argument("--num-words", type=int, default=1, help="Number of words to display per token")
     parser.add_argument("--size", type=int, default=1000, help="Size to standardize the image to")
     parser.add_argument("--save-img", type=str, default=None, help="Path to save the image to")
     parser.add_argument("--save-words", type=str, default=None, help="Path to save the words to")
+    parser.add_argument("--preload", action="store_true", help="Preload the models and exit")
     args = parser.parse_args()
-    process_image_cli(args.img_url, args.num_words, args.size, args.save_img, args.save_words)
 
+    if args.preload:
+        preload_models()
+        print("Models preloaded successfully.")
+        exit(0)
+    elif args.img_url:
+        process_image_cli(args.img_url, args.num_words, args.size, args.save_img, args.save_words)
+    else:
+        parser.print_help()
