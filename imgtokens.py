@@ -2,6 +2,7 @@
 from io import BytesIO
 import json
 from functools import lru_cache
+import time
 
 from PIL import Image
 from PIL import ImageDraw, ImageFont
@@ -151,7 +152,9 @@ class ImagePatchWordTokenizer:
         Returns a tuple of indices and strengths.
         """
         # img_tokens is shape <tok, dim>
+        start_time = time.time()
         similarity_matrix = self.sim_engine.similarity_matrix(img_tokens, similarity)  # <tok, vocab>
+        print(f"Computed similarity matrix in {time.time() - start_time:.3f} seconds using {similarity} method")
         k_closest = torch.topk(similarity_matrix, k=k, dim=-1).indices  # <tok, k>
         strengths = torch.gather(similarity_matrix, 1, k_closest)  # <tok, k>
         return k_closest, strengths

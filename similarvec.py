@@ -1,5 +1,8 @@
 import torch
+import torch.nn as nn
+import torch.optim as optim
 import torch.nn.functional as F
+from tqdm.auto import tqdm
 
 
 def all_to_all_l2_distance(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
@@ -21,36 +24,58 @@ def all_to_all_cosine_similarity(a: torch.Tensor, b: torch.Tensor) -> torch.Tens
     return torch.mm(a_normalized, b_normalized.t())
 
 
-def batch_regularized_least_squares(A: torch.Tensor, B: torch.Tensor, lambda_reg: float = 1.0) -> torch.Tensor:
+def regularized_least_squares(A: torch.Tensor, B: torch.Tensor, lambda_reg: float = 1.0) -> torch.Tensor:
     # A: basis vectors (32000 x 4096)
-    # B: query vectors (4096 x 500)
+    # B: query vectors (500 x 4096)
     # lambda_reg: regularization parameter
-    # Returns: coefficients (32000 x 500)
+    # Returns: coefficients (500 x 32000)
     m, n = A.shape
-    ATA = torch.mm(A.t(), A)
-    reg_term = lambda_reg * torch.eye(n, device=A.device)
-    X = torch.linalg.solve(ATA + reg_term, torch.mm(A.t(), B))
-    return X
+    ATA = torch.mm(A, A.T)  # This uses many GB of memory
+    reg_term = lambda_reg * torch.eye(m, device=A.device)
+    X = torch.linalg.solve(ATA + reg_term, torch.mm(A, B.T))
+    return X.T
 
 
-def batch_l1_minimization(A: torch.Tensor, B: torch.Tensor, num_iterations: int = 1000, learning_rate: float = 0.01) -> torch.Tensor:
+def sparse_reconstruction(A: torch.Tensor, B: torch.Tensor, num_iterations: int = 400, learning_rate: float = 0.03) -> torch.Tensor:
+    """Explicitly solves for the coefficients of the basis vectors in the least squares sense,
+    using an L1 regularization on the coefficients to promote sparsity.
+
+    I have not seen this work well.
+    """
+    l1_lambda = 0.03  # L1 regularization strength
     # A: basis vectors (32000 x 4096)
-    # B: query vectors (4096 x 500)
-    X = nn.Parameter(torch.zeros(32000, 500))  # Initialize coefficients
-    optimizer = optim.Adam([X], lr=learning_rate)
-    loss_fn = nn.L1Loss()
+    # B: query vectors (500 x 4096)
+    m = A.shape[0]
+    n = B.shape[0]
+    device = A.device
+    X = nn.Parameter(0.1 * torch.rand(n, m, device=device))
+    optimizer = optim.AdamW([X], lr=learning_rate, weight_decay=0.01)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_iterations)
 
-    for _ in range(num_iterations):
+    print(f"Initial L2 norm of B: {torch.norm(B, dim=1, p=2).mean():.4f}.  (If the err doesn't go below this, we're not learning anything.)")
+
+    progress = tqdm(range(num_iterations))
+    for _ in progress:
         optimizer.zero_grad()
-        reconstruction = A @ X
-        loss = loss_fn(reconstruction, B) + 0.1 * torch.norm(X, 1)  # L1 regularization
-        loss.backward()
+        reconstruction = torch.matmul(X, A)
+        err = reconstruction - B
+        # Loss per token
+        err_loss = torch.norm(err, dim=1, p=2)
+        # Loss per basis vector
+        l1_loss = torch.norm(X, dim=1, p=1)
+        loss = err_loss + l1_lambda * l1_loss
+        scalar_loss = loss.mean()
+        progress.set_description(f"err={err_loss.mean():.4f} l1={l1_loss.mean():.4f}")
+        scalar_loss.backward()
         optimizer.step()
+        scheduler.step()
 
     return X.detach()
 
+
 def batch_omp(queries: torch.Tensor, vocab: torch.Tensor, coef_cnt: int) -> torch.Tensor:
     """Uses orthogonal matching pursuit to find the best subset of basis vectors to reconstruct the query vectors.
+    This is great!
     """
     # vocab: basis vectors e.g. (32046 x 4096)
     # queries: query vectors e.g. (576 x 4096)
@@ -100,10 +125,11 @@ class SimilarityEngine:
     basis elements that best approximate each token.
     """
 
-    def __init__(self, vocab: torch.Tensor):
+    def __init__(self, vocab: torch.Tensor, allow_bad_algorithms:bool = False):
         # Convert to fp32 because many algorithms need it
         self.vocab = vocab.to(torch.float32)  # lots of things work better in fp32
-        self.vocab_pinv = torch.pinverse(self.vocab)
+        self.vocab_pinv = None
+        self.allow_bad_algorithms = allow_bad_algorithms
 
     def similarity_matrix(self, tokens: torch.Tensor, method:str, cnt:int = 8) -> torch.Tensor:
         """Given a set of tokens <tokens, dim> compute the similarity matrix to the vocabulary.
@@ -111,10 +137,16 @@ class SimilarityEngine:
         :args cnt: is the number of basis vectors to use. (only used by omp)
         :args method: is a string that describes what method of similarity to use
           - "l2" is euclidean distance returned as -dist/sqrt(num_dims)
-          - "cosine" is cosine similarity
+          - "cosine" is cosine similarity  (actually doesn't work very well)
           - "dot" is dot product similarity
-          - "pinv" uses the pseudo-inverse of the vocab matrix to reconsruct each token vector
           - "omp" uses orthogonal matching pursuit to find a subset of basis vectors
+
+        The bad methods which are left in for curiosity sake, but not recommended:
+          - "pinv" uses the pseudo-inverse of the vocab matrix to reconsruct each token vector
+          - "sparse" runs an Adam optimization to find the best subset of basis vectors, L1-penalized for sparseness
+            This is slow, and never works very well, but might if you tune it well.
+          - "rls" uses regularized least squares to find the best subset of basis vectors
+            This needs a lot of memory, and isn't even great.
         """
         tokens32 = tokens.to(torch.float32)
         dim = self.vocab.shape[1]
@@ -127,10 +159,21 @@ class SimilarityEngine:
             return all_to_all_cosine_similarity(tokens32, self.vocab)
         elif method == "dot":
             return torch.matmul(tokens32, self.vocab.T)
-        elif method == "pinv":
-            return torch.matmul(tokens32, self.vocab_pinv)
         elif method == "omp":
             return batch_omp(tokens32, self.vocab, cnt)
+        
+        if not self.allow_bad_algorithms:
+            raise ValueError(f"Similarity method {method} is either unknown or too sucky to allow")
+        if method == "pinv":
+            if self.vocab_pinv is None:
+                self.vocab_pinv = torch.pinverse(self.vocab)  # slow and doesn't work well
+            return torch.matmul(tokens32, self.vocab_pinv)
+        elif method == "sparse":
+            # This one is quite slow, and need tuning to work well.
+            return sparse_reconstruction(self.vocab, tokens32)
+        elif method == "rls":
+            # Uses lots of memory, and isn't even great.
+            return regularized_least_squares(self.vocab, tokens32)
         else:
             raise ValueError(f"Unknown similarity method: {method}")
 
