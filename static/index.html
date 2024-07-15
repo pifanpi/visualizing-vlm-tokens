@@ -11,8 +11,13 @@
         <label for="file">Choose an image to tokenize:</label>
         <input type="file" id="file" name="file" accept="image/*" required>
         <br><br>
-        <label for="num_words">Number of words per patch:</label>
-        <input type="number" id="num_words" name="num_words" value="8" min="1">
+        <label for="similarity">Select similarity measure:</label>
+        <select id="similarity" name="similarity">
+            <option value="omp" selected>Orthogonal Matching Pursuit (OMP)</option>
+            <option value="l2">L2 (Euclidean Distance)</option>
+            <option value="cosine">Cosine Similarity</option>
+            <option value="dot">Dot Product</option>
+        </select>
         <br><br>
         <button type="submit">Upload</button>
     </form>

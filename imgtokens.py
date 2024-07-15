@@ -4,12 +4,13 @@ import json
 from functools import lru_cache
 import time
 
-from PIL import Image
-from PIL import ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont
 from imgcat import imgcat
-from transformers import BitsAndBytesConfig
-from transformers import LlavaNextProcessor, LlavaNextForConditionalGeneration
+from transformers import BitsAndBytesConfig, LlavaNextProcessor, LlavaNextForConditionalGeneration
 import argparse
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 import requests
 import torch
 import torch.nn.functional as F
@@ -71,15 +72,21 @@ class WordList:
         self.strengths.append(strength)
         self.token_ids.append(token_id)
 
-    def as_html(self) -> str:
+    def as_html(self, include_metric: bool = False) -> str:
         """Renders the words as HTML for a plotly tooltip
         """
         html = ""
         for word, strength, tokid in zip(self.words, self.strengths, self.token_ids):
+            if strength < 1e-3:
+                html += "...<br>"
+                break
             word_str = str(word)
             if len(word_str) == 0:
                 word_str = f"<blank token {tokid}>"
-            html += f"{word_str} ({self.metric}: {strength:.3f})<br>"
+            if include_metric:
+                html += f"{word_str} ({self.metric}: {strength:.3f})<br>"
+            else:
+                html += f"{word_str} ({strength:.3f})<br>"
         return html
 
     def first(self) -> str:
@@ -124,7 +131,7 @@ class ImagePatchWordTokenizer:
         else:
             quantization_config = None
         self.model = HackedLlavaNextReturnsImageTokens.from_pretrained(
-            self.model_str, cache_dir="", quantization_config=quantization_config
+            self.model_str, cache_dir="", quantization_config=quantization_config, low_cpu_mem_usage=True
         )
         self.processor = LlavaNextProcessor.from_pretrained(self.model_str, torch_dtype=torch.float16)
         self.processor.tokenizer.padding_side = "left"
@@ -242,7 +249,7 @@ class ImagePatchWordTokenizer:
                 draw.text((text_x, text_y), text, font=font, fill=text_color)
         return img
 
-    def process_img(self, img: Image.Image, num_words: int = 1, similarity: str = "omp") -> list[list[str]]:
+    def process_img(self, img: Image.Image, num_words: int = 6, similarity: str = "omp") -> list[list[str]]:
         """Takes an image, and returns a visualization of the image tokens.
         """
         self.set_image(img)
@@ -250,7 +257,7 @@ class ImagePatchWordTokenizer:
         words = self._vectors_to_words(tokens[0], num_words, similarity)
         return words
 
-    def draw_with_plotly(self, words: list[list[str]], size: int = 1500, iframe:bool = True) -> "go.Figure":
+    def draw_with_plotly(self, words: list[list[str]], size: int = 1500, iframe:bool = True) -> go.Figure:
         """Renders the image, and overlays a grid with words in it, in iPython notebook using plotly
         :param words: the word list returned by process_img
         :param size: the size of the image to render
@@ -258,9 +265,6 @@ class ImagePatchWordTokenizer:
         :param show_plot: if True, will show the plot in a popup window
         :returns: a plotly figure
         """
-        import plotly.express as px
-        import pandas as pd
-        import plotly.graph_objects as go
         if iframe:
             # A common workaround for jupyter problems
             import plotly.io as pio
@@ -331,9 +335,9 @@ def preload_models(model_str: str="llava-hf/llava-v1.6-vicuna-7b-hf"):
     # The models download and cache appropriately, but
     # when an IPWT is created it downloads them again itself.
     print(f"Preloading model {model_str}")
-    HackedLlavaNextReturnsImageTokens.from_pretrained(model_str)
+    HackedLlavaNextReturnsImageTokens.from_pretrained(model_str, low_cpu_mem_usage=True)
     print(f"Preloading processor for {model_str}")
-    LlavaNextProcessor.from_pretrained(model_str, torch_dtype=torch.float16)
+    LlavaNextProcessor.from_pretrained(model_str, torch_dtype=torch.float16, low_cpu_mem_usage=True)
     print("Done preloading models.")
 
 
