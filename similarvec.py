@@ -83,8 +83,11 @@ def batch_omp(queries: torch.Tensor, vocab: torch.Tensor, coef_cnt: int) -> torc
     device = vocab.device
     m, d = vocab.shape  # m = 32046, d = 4096
     n, _ = queries.shape  # n = 576
+
     # X keeps track of the coefficients for each token, for each basis vector
-    X = torch.zeros(m, n, device=device)
+    # We initialize it all to -999, because sometimes the selected basis vectors actually
+    # get negative scores.  This ensures the selected ones still have the highest values.
+    X = torch.zeros(m, n, device=device) - 999
     # residual is the remaining error to be corrected
     residual = queries.clone()
     # selected_indices is the index of the basis vectors that are selected for each token
@@ -104,6 +107,7 @@ def batch_omp(queries: torch.Tensor, vocab: torch.Tensor, coef_cnt: int) -> torc
             idx = selected_indices[:i+1, j]
             vocab_selected = vocab[idx]
             sol = torch.linalg.lstsq(vocab_selected.T, queries[j]).solution
+            sol = sol.detach()
             X[idx, j] = sol
             residual[j] = queries[j] - torch.matmul(vocab_selected.t(), sol)
     

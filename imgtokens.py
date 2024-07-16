@@ -15,7 +15,7 @@ import requests
 import torch
 import torch.nn.functional as F
 
-from similarvec import SimilarityEngine
+import similarvec
 
 class BailOutWithData(RuntimeError):
     """A glorious hack!  This lets you bail out in the middle of somebody else's code 
@@ -84,9 +84,6 @@ class WordList:
                 lines.append(f"{word_str} ({self.metric}: {strength:.3f})")
             else:
                 lines.append(f"{word_str} ({strength:.3f})")
-            if strength < 1e-3:
-                lines.append("...")
-                break
         html = "<br>".join(lines)
         return html
 
@@ -141,7 +138,7 @@ class ImagePatchWordTokenizer:
         # ^^ returns a strangely empty object which seems like it's all zeros.
         embedding_matrix = self.model.language_model.model.embed_tokens.weight  # <vocab, dim>
         self.embedding_matrix = self.model.language_model.model.embed_tokens.weight  # <vocab, dim>
-        self.sim_engine = SimilarityEngine(self.embedding_matrix)
+        self.sim_engine = similarvec.SimilarityEngine(self.embedding_matrix)
 
     def _extract_image_features(self) -> torch.Tensor:
         self._init_model()
@@ -161,7 +158,7 @@ class ImagePatchWordTokenizer:
         """
         # img_tokens is shape <tok, dim>
         start_time = time.time()
-        similarity_matrix = self.sim_engine.similarity_matrix(img_tokens, similarity)  # <tok, vocab>
+        similarity_matrix = self.sim_engine.similarity_matrix(img_tokens, similarity, cnt=k)  # <tok, vocab>
         print(f"Computed similarity matrix in {time.time() - start_time:.3f} seconds using {similarity} method")
         k_closest = torch.topk(similarity_matrix, k=k, dim=-1).indices  # <tok, k>
         strengths = torch.gather(similarity_matrix, 1, k_closest)  # <tok, k>
