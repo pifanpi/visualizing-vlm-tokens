@@ -49,7 +49,10 @@ async def process_image(request: Request, file: UploadFile = File(...), similari
     ipwt: imgtokens.ImagePatchWordTokenizer = request.app.state.ipwt
     words = ipwt.process_img(img, similarity=similarity, num_words=num_words)
     fig = ipwt.draw_with_plotly(words)
-    html = fig.to_html(include_plotlyjs="cdn")
+    plotly_config = {
+        "displayModeBar": False,
+    }
+    html = fig.to_html(include_plotlyjs="cdn", config=plotly_config)
     return HTMLResponse(content=html)
 
 

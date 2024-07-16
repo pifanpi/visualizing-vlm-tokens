@@ -5,19 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VLM Token Visualizer</title>
 </head>
-<body>
-    <h1>VLM Token Visualizer</h1>
+<body style="background-color: black; color: white;">
     <form action="/process-image/" method="post" enctype="multipart/form-data">
-        <label for="file">Choose an image to tokenize:</label>
+        <label for="file">Try it on your own image:</label>
         <input type="file" id="file" name="file" accept="image/*" required>
-        <br><br>
-        <label for="similarity">Select similarity measure:</label>
-        <select id="similarity" name="similarity">
-            <option value="omp" selected>Orthogonal Matching Pursuit (OMP)</option>
-            <option value="l2">L2 (Euclidean Distance)</option>
-            <option value="cosine">Cosine Similarity</option>
-            <option value="dot">Dot Product</option>
-        </select>
         <br><br>
         <button type="submit">Upload</button>
     </form>

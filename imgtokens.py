@@ -75,18 +75,19 @@ class WordList:
     def as_html(self, include_metric: bool = False) -> str:
         """Renders the words as HTML for a plotly tooltip
         """
-        html = ""
+        lines = []
         for word, strength, tokid in zip(self.words, self.strengths, self.token_ids):
-            if strength < 1e-3:
-                html += "...<br>"
-                break
             word_str = str(word)
             if len(word_str) == 0:
                 word_str = f"<blank token {tokid}>"
             if include_metric:
-                html += f"{word_str} ({self.metric}: {strength:.3f})<br>"
+                lines.append(f"{word_str} ({self.metric}: {strength:.3f})")
             else:
-                html += f"{word_str} ({strength:.3f})<br>"
+                lines.append(f"{word_str} ({strength:.3f})")
+            if strength < 1e-3:
+                lines.append("...")
+                break
+        html = "<br>".join(lines)
         return html
 
     def first(self) -> str:
@@ -290,14 +291,21 @@ class ImagePatchWordTokenizer:
         df = pd.DataFrame(data)
 
         fig = px.imshow(img, width=img.width, height=img.height, binary_format="jpg")
+        fig.update_layout(
+            xaxis=dict(showgrid=False, zeroline=False, visible=False),
+            yaxis=dict(showgrid=False, zeroline=False, visible=False),
+            margin=dict(l=0, r=0, t=0, b=0),  # Set all margins to zero
+            plot_bgcolor='rgba(0,0,0,0)',  # Transparent background
+            paper_bgcolor='rgba(0,0,0,0)',  # Transparent background
+        )
         fig.add_trace(go.Scatter(
             x=df["x"], 
             y=df["y"], 
             text=df["firstword"], 
             hovertext=df["words"],
+            hoverinfo="text",
             mode="text", 
             textposition="bottom center",
-            hoverinfo="text", # prevents pixel coordinates from showing up in hover
         ))
         return fig
 
