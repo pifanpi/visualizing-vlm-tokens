@@ -73,7 +73,7 @@ def sparse_reconstruction(A: torch.Tensor, B: torch.Tensor, num_iterations: int 
     return X.detach()
 
 
-def batch_omp(queries: torch.Tensor, vocab: torch.Tensor, coef_cnt: int) -> torch.Tensor:
+def batch_omp(queries: torch.Tensor, vocab: torch.Tensor, coef_cnt: int, pos_only: bool = False) -> torch.Tensor:
     """Uses orthogonal matching pursuit to find the best subset of basis vectors to reconstruct the query vectors.
     This is great!
     """
@@ -85,9 +85,7 @@ def batch_omp(queries: torch.Tensor, vocab: torch.Tensor, coef_cnt: int) -> torc
     n, _ = queries.shape  # n = 576
 
     # X keeps track of the coefficients for each token, for each basis vector
-    # We initialize it all to -999, because sometimes the selected basis vectors actually
-    # get negative scores.  This ensures the selected ones still have the highest values.
-    X = torch.zeros(m, n, device=device) - 999
+    X = torch.zeros(m, n, device=device)
     # residual is the remaining error to be corrected
     residual = queries.clone()
     # selected_indices is the index of the basis vectors that are selected for each token
@@ -104,12 +102,21 @@ def batch_omp(queries: torch.Tensor, vocab: torch.Tensor, coef_cnt: int) -> torc
         # For each token, run least-squares to find the best combination of
         # selected basis vectors, and update the residual
         for j in range(n):
-            idx = selected_indices[:i+1, j]
+            if pos_only:
+                # Only adjust the most recently found token
+                idx = selected_indices[i:i+1, j]
+                target = residual[j]
+            else:
+                idx = selected_indices[:i+1, j]
+                target = queries[j]
             vocab_selected = vocab[idx]
-            sol = torch.linalg.lstsq(vocab_selected.T, queries[j]).solution
+            sol = torch.linalg.lstsq(vocab_selected.T, target).solution
             sol = sol.detach()
             X[idx, j] = sol
-            residual[j] = queries[j] - torch.matmul(vocab_selected.t(), sol)
+            # TODO: This is much faster if we only used the selected basis vectors
+            # instead of the whole vocab
+            # residual[j] = queries[j] - torch.matmul(vocab_selected.t(), sol)
+            residual[j] = queries[j] - torch.matmul(vocab.t(), X[:,j])
     
     return X.T
 
@@ -165,6 +172,8 @@ class SimilarityEngine:
             return torch.matmul(tokens32, self.vocab.T)
         elif method == "omp":
             return batch_omp(tokens32, self.vocab, cnt)
+        elif method == "ompp":
+            return batch_omp(tokens32, self.vocab, cnt, pos_only=True)
         
         if not self.allow_bad_algorithms:
             raise ValueError(f"Similarity method {method} is either unknown or too sucky to allow")
