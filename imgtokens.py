@@ -30,7 +30,8 @@ class HackedLlavaNextReturnsImageTokens(LlavaNextForConditionalGeneration):
     projected into LLM space.
     """
     def pack_image_features(self, image_features, image_sizes, image_newline=None):
-        raise BailOutWithData(image_features[0])
+        output = image_features[0]
+        raise BailOutWithData(output)
 
 class XiaoDict:
     """Small chinese dictionary
@@ -222,7 +223,7 @@ class ImagePatchWordTokenizer:
     def set_image(self, img: Image.Image):
         self.img = self._standardize_img(img)
 
-    def render_words_on_image(self, words: list[list[str]], size:int=1000) -> Image.Image:
+    def render_words_on_image(self, words: list[list[str]], size: int = 1000) -> Image.Image:
         """Renders the words on the image, in the center of each cell.
         Returns a new image.
         """
@@ -307,7 +308,7 @@ class ImagePatchWordTokenizer:
         return fig
 
 
-def process_image_cli(img_url: str, num_words: int = 1, size: int = 1000, save_img: str = None, save_words: str = None):
+def process_image_cli(img_url: str, num_words: int = 1, size: int = 1000, save_img: str = None, save_words: str = None, save_html: str = None):
     if img_url.startswith("http"):
         print(f"Fetching img from {img_url}")
         response = requests.get(img_url)
@@ -332,6 +333,16 @@ def process_image_cli(img_url: str, num_words: int = 1, size: int = 1000, save_i
         rendered.save(save_img, quality=95)
         print(f"Saved image to {save_img}")
 
+    if save_html is not None:
+        fig = ipwt.draw_with_plotly(words)
+        plotly_config = {
+            "displayModeBar": False,
+        }
+        html = fig.to_html(include_plotlyjs="cdn", config=plotly_config)
+        with open(save_html, "w") as f:
+            f.write(html)
+        print(f"Saved html to {save_html}")
+
 
 def preload_models(model_str: str="llava-hf/llava-v1.6-vicuna-7b-hf"):
     """Preloads the models for the server.
@@ -353,6 +364,7 @@ if __name__ == "__main__":
     parser.add_argument("--size", type=int, default=1000, help="Size to standardize the image to")
     parser.add_argument("--save-img", type=str, default=None, help="Path to save the image to")
     parser.add_argument("--save-words", type=str, default=None, help="Path to save the words to")
+    parser.add_argument("--save-html", type=str, default=None, help="Path to save the html to")
     parser.add_argument("--preload", action="store_true", help="Preload the models and exit")
     args = parser.parse_args()
 
@@ -361,6 +373,6 @@ if __name__ == "__main__":
         print("Models preloaded successfully.")
         exit(0)
     elif args.img_url:
-        process_image_cli(args.img_url, args.num_words, args.size, args.save_img, args.save_words)
+        process_image_cli(args.img_url, args.num_words, args.size, args.save_img, args.save_words, args.save_html)
     else:
         parser.print_help()
