@@ -189,4 +189,3 @@ class SimilarityEngine:
             return regularized_least_squares(self.vocab, tokens32)
         else:
             raise ValueError(f"Unknown similarity method: {method}")
-
