@@ -4,11 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VLM Token Visualizer</title>
-</head>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VLM Token Visualizer</title>
     <style>
         body {
             background-color: #181818;
@@ -18,11 +13,44 @@
     </style>
 </head>
 <body>
-    <form action="/process-image/" method="post" enctype="multipart/form-data">
+    <form id="uploadForm" action="/process-image/" method="post" enctype="multipart/form-data">
         <label for="file">Try it on your own image:</label>
         <input type="file" id="file" name="file" accept="image/*" required>
         <br><br>
         <button type="submit">Upload</button>
     </form>
+    <div id="processingMessage" style="display: none;">Processing...</div>
+    <div id="results"></div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+    $(document).ready(function() {
+        $('#uploadForm').on('submit', function(e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+
+            $.ajax({
+                url: $(this).attr('action'),
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                beforeSend: function() {
+                    $('#processingMessage').show();
+                    $('#results').empty();
+                },
+                success: function(data) {
+                    $('#results').html(data);
+                },
+                error: function(xhr, status, error) {
+                    $('#results').html('An error occurred: ' + error);
+                },
+                complete: function() {
+                    $('#processingMessage').hide();
+                }
+            });
+        });
+    });
+    </script>
 </body>
 </html>
