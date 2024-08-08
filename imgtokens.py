@@ -338,7 +338,7 @@ def process_image_cli(img_url: str, num_words: int = 1, size: int = 1000, save_i
         plotly_config = {
             "displayModeBar": False,
         }
-        html = fig.to_html(include_plotlyjs="cdn", config=plotly_config)
+        html = fig.to_html(include_plotlyjs="cdn", config=plotly_config, full_html=False)
         with open(save_html, "w") as f:
             f.write(html)
         print(f"Saved html to {save_html}")

@@ -13,6 +13,7 @@
     </style>
 </head>
 <body>
+    <div id="vlm-token-content">(loading...)</div>
     <form id="uploadForm" action="/process-image/" method="post" enctype="multipart/form-data">
         <label for="file">Try it on your own image:</label>
         <input type="file" id="file" name="file" accept="image/*" required>
@@ -20,11 +21,15 @@
         <button type="submit">Upload</button>
     </form>
     <div id="processingMessage" style="display: none;">Processing...</div>
-    <div id="results"></div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script charset="utf-8" src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
     <script>
     $(document).ready(function() {
+        $.get('/static/robot-arm.html', function(data) {
+            console.log("Got data");
+            $('#vlm-token-content').html(data);
+        });
         $('#uploadForm').on('submit', function(e) {
             e.preventDefault();
             var formData = new FormData(this);
@@ -37,13 +42,13 @@
                 contentType: false,
                 beforeSend: function() {
                     $('#processingMessage').show();
-                    $('#results').empty();
+                    $('#vlm-token-content').html('Processing...');
                 },
                 success: function(data) {
-                    $('#results').html(data);
+                    $('#vlm-token-content').html(data);
                 },
                 error: function(xhr, status, error) {
-                    $('#results').html('An error occurred: ' + error);
+                    $('#vlm-token-content').html('An error occurred processing your image. ' + error);
                 },
                 complete: function() {
                     $('#processingMessage').hide();

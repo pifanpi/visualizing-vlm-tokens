@@ -1,7 +1,10 @@
 from io import BytesIO
 
+
+
 from fastapi import FastAPI, File, HTTPException, UploadFile, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from PIL import Image
 import uvicorn
 
@@ -10,6 +13,7 @@ import imgtokens
 app = FastAPI()
 app.state.initialized = False  # Add this line
 app.state.preload_model = False  # Slower startup, faster response
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 def init_ipwt():
@@ -44,7 +48,6 @@ async def readiness():
 @app.get("/")
 async def read_index():
     return FileResponse("static/index.html")
-
 
 @app.post("/process-image/")
 async def process_image(request: Request, file: UploadFile = File(...), similarity: str = "omp", num_words: int = 10):
