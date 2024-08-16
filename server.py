@@ -11,8 +11,8 @@ import uvicorn
 import imgtokens
 
 app = FastAPI()
-app.state.initialized = False  # Add this line
-app.state.preload_model = False  # Slower startup, faster response
+app.state.initialized = False
+app.state.preload_model = True  # Slower startup, faster response
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
@@ -64,7 +64,7 @@ async def process_image(request: Request, file: UploadFile = File(...), similari
 
     ipwt: imgtokens.ImagePatchWordTokenizer = init_ipwt()
     words = ipwt.process_img(img, similarity=similarity, num_words=num_words)
-    fig = ipwt.draw_with_plotly(words)
+    fig = ipwt.draw_with_plotly(words, size=1000)
     plotly_config = {
         "displayModeBar": False,
     }

@@ -6,7 +6,7 @@
     <title>VLM Token Visualizer</title>
     <style>
         :root {
-            --target-viz-width: 1500px; /* Define CSS variable for target width */
+            --target-viz-width: 1000px;
         }
         body {
             background-color: #181818;
@@ -15,18 +15,18 @@
         }
         .vlm-token-content-outer {
             width: 100%;
-            height: 500px;
             display: flex;
             justify-content: center;
             align-items: center;
             position: relative;
             overflow: hidden;
+            height: 750px; /* Initial height */
         }
         .vlm-token-content {
             display: flex;
             justify-content: center;
             align-items: center;
-            width: var(--target-viz-width); /* Use CSS variable */
+            width: var(--target-viz-width);
             height: 100%;
             position: absolute;
             top: 0;
@@ -100,6 +100,7 @@
             const outerWidth = outer.clientWidth;
             const scale = outerWidth < targetWidth ? outerWidth / targetWidth : 1;
             inner.style.transform = `scale(${scale})`;
+            outer.style.height = `${750 * scale}px`; // Adjust height based on scale
         }
 
         $(window).on('resize', adjustScale);

@@ -334,7 +334,7 @@ def process_image_cli(img_url: str, num_words: int = 1, size: int = 1000, save_i
         print(f"Saved image to {save_img}")
 
     if save_html is not None:
-        fig = ipwt.draw_with_plotly(words)
+        fig = ipwt.draw_with_plotly(words, size=1000)
         plotly_config = {
             "displayModeBar": False,
         }
