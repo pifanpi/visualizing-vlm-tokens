@@ -173,8 +173,6 @@
             const scale = containerWidth < targetWidth ? containerWidth / targetWidth : 1;
             mainImage.style.transform = `scale(${scale})`;
             container.style.transform = `scale(${scale})`;
-            // container.style.width = containerWidth;
-            // container.style.height = `${targetHeight * scale}px`;
         }
         // Call updateImages after all AJAX calls are complete
         $.when(
