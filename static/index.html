@@ -6,9 +6,7 @@
     <title>VLM Token Visualizer</title>
     <style>
         :root {
-            /* --target-viz-width: 1000px; */
-            --target-viz-width: 1250px;
-            --target-viz-height: 750px;
+            --target-viz-width: 1000px;
         }
         body {
             background-color: #181818;
@@ -22,7 +20,6 @@
             align-items: center;
             position: relative;
             overflow: hidden;
-            /* height: 750px; Initial height */
             height: auto;
         }
         .vlm-token-content {
@@ -30,19 +27,17 @@
             justify-content: center;
             align-items: center;
             width: var(--target-viz-width);
-            /* height: 100%; */
             height: auto;
             position: absolute;
             top: 0;
             left: 0;
-            transform-origin: top left; /* Ensure scaling happens from the top left corner */
+            transform-origin: top left;
         }
         .vlm-token-content > * {
             max-width: 100%;
             max-height: 100%;
             width: 100%;
             height: 100%;
-            /* object-fit: contain; */
             object-fit: cover;
         }
         .side-images {
@@ -51,6 +46,7 @@
             justify-content: center;
             gap: 10px;
             margin-top: 10px;
+            margin-bottom: 10px;
         }
         .side-image {
             width: 200px;
@@ -64,11 +60,9 @@
             height: 100%;
             object-fit: cover;
         }
-        /* @media (min-width: 600px) {
-            .vlm-token-content {
-                transform: scale(1); /* No scaling when viewport is wider than inner width 
-            }
-        } */
+        .upload-form {
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -80,12 +74,14 @@
         <div class="side-image" id="side-image-2"></div>
         <div class="side-image" id="side-image-3"></div>
     </div>
-    <form id="uploadForm" action="/process-image/" method="post" enctype="multipart/form-data">
-        <label for="file">Try it on your own image:</label>
-        <input type="file" id="file" name="file" accept="image/*" required>
-        <br><br>
-        <button type="submit">Upload</button>
-    </form>
+    <div class="upload-form"></div>
+        <form id="uploadForm" action="/process-image/" method="post" enctype="multipart/form-data">
+            <label for="file">Try it on your own image:</label>
+            <input type="file" id="file" name="file" accept="image/*" required>
+            <br><br>
+            <button type="submit">Upload</button>
+        </form>
+    </div>
     <div id="processingMessage" style="display: none;">Processing...</div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -95,20 +91,19 @@
         let grassCatMainContent, grassCatSideContent, pickingTomatoMainContent, pickingTomatoSideContent, workDeskMainContent, workDeskSideContent;
         let currentMainImage = 'grassCat';
 
-        $.get('/static/grass-cat.html', function(data) {
-            // grassCatMainContent = data;
-            grassCatMainContent = '<div style="width:100%;height:100%;"><img src="/static/grass-cat.jpg" alt="Cat hiding in grass" style="width:100%;height:100%;object-fit:cover;"></div>';
+        $.get('/static/grass-cat-2.html', function(data) {
+            grassCatMainContent = data;
             grassCatSideContent = '<img src="/static/grass-cat.jpg" alt="Cat hiding in grass">';
             $('#side-image-1').html(grassCatSideContent);
         });
 
-        $.get('/static/picking-tomato.html', function(data) {
+        $.get('/static/picking-tomato-2.html', function(data) {
             pickingTomatoMainContent = data;
             pickingTomatoSideContent = '<img src="/static/picking-tomato.webp" alt="Hand picking a tomato">';
             $('#side-image-2').html(pickingTomatoSideContent);
         });
 
-        $.get('/static/work-desk.html', function(data) {
+        $.get('/static/work-desk-2.html', function(data) {
             workDeskMainContent = data;
             workDeskSideContent = '<img src="/static/work-desk.jpg" alt="Work desk">';
             $('#side-image-3').html(workDeskSideContent);
@@ -165,6 +160,7 @@
                 complete: function() {
                     $('#processingMessage').hide();
                     $submitButton.prop('disabled', false).css('opacity', '1');
+                    // adjustScale();
                 }
             });
         });
@@ -180,9 +176,9 @@
         }
 
         $.when(
-            $.get('/static/work-desk.html'),
-            $.get('/static/grass-cat.html'),
-            $.get('/static/picking-tomato.html')
+            $.get('/static/work-desk-2.html'),
+            $.get('/static/grass-cat-2.html'),
+            $.get('/static/picking-tomato-2.html')
         ).done(function(workDesk, grassCat, pickingTomato) {
             // Initialize images
             $('#vlm-token-content').html(grassCatMainContent);
