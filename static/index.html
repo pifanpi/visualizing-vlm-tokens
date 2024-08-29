@@ -88,49 +88,50 @@
     <script charset="utf-8" src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
     <script>
     $(document).ready(function() {
-        let grassCatMainContent, grassCatSideContent, pickingTomatoMainContent, pickingTomatoSideContent, workDeskMainContent, workDeskSideContent;
-        let currentMainImage = 'grassCat';
+        // let grassCatMainContent, grassCatSideContent, pickingTomatoMainContent, pickingTomatoSideContent, workDeskMainContent, workDeskSideContent;
+        let latheMainContent, latheSideContent, robotMainContent, robotSideContent, storeMainContent, storeSideContent;
+        let currentMainImage = 'store';
 
-        $.get('/static/grass-cat-2.html', function(data) {
-            grassCatMainContent = data;
-            grassCatSideContent = '<img src="/static/grass-cat.jpg" alt="Cat hiding in grass">';
-            $('#side-image-1').html(grassCatSideContent);
+        $.get('/static/store.html', function(data) {
+            storeMainContent = data;
+            storeSideContent = '<img src="/static/store.jpeg" alt="Grocery store">';
+            $('#side-image-1').html(storeSideContent);
         });
 
-        $.get('/static/picking-tomato-2.html', function(data) {
-            pickingTomatoMainContent = data;
-            pickingTomatoSideContent = '<img src="/static/picking-tomato.webp" alt="Hand picking a tomato">';
-            $('#side-image-2').html(pickingTomatoSideContent);
+        $.get('/static/lathe.html', function(data) {
+            latheMainContent = data;
+            latheSideContent = '<img src="/static/lathe.png" alt="Lathe">';
+            $('#side-image-2').html(latheSideContent);
         });
 
-        $.get('/static/work-desk-2.html', function(data) {
-            workDeskMainContent = data;
-            workDeskSideContent = '<img src="/static/work-desk.jpg" alt="Work desk">';
-            $('#side-image-3').html(workDeskSideContent);
+        $.get('/static/robot.html', function(data) {
+            robotMainContent = data;
+            robotSideContent = '<img src="/static/robot.png" alt="Robot">';
+            $('#side-image-3').html(robotSideContent);
         });
 
         function updateImages() {
-            if (currentMainImage === 'workDesk') {
-                $('#vlm-token-content').html(workDeskMainContent);
-            } else if (currentMainImage === 'grassCat') {
-                $('#vlm-token-content').html(grassCatMainContent);
-            } else if (currentMainImage === 'pickingTomato') {
-                $('#vlm-token-content').html(pickingTomatoMainContent);
+            if (currentMainImage === 'store') {
+                $('#vlm-token-content').html(storeMainContent);
+            } else if (currentMainImage === 'lathe') {
+                $('#vlm-token-content').html(latheMainContent);
+            } else if (currentMainImage === 'robot') {
+                $('#vlm-token-content').html(robotMainContent);
             }
-            $('#side-image-1').html(grassCatSideContent);
-            $('#side-image-2').html(pickingTomatoSideContent);
-            $('#side-image-3').html(workDeskSideContent);
+            $('#side-image-1').html(storeSideContent);
+            $('#side-image-2').html(latheSideContent);
+            $('#side-image-3').html(robotSideContent);
             adjustScale();
         }
 
         $('.side-image').on('click', function() {
             const clickedImageSrc = $(this).find('img').attr('src');
-            if (clickedImageSrc.includes('grass-cat')) {
-                currentMainImage = 'grassCat';
-            } else if (clickedImageSrc.includes('picking-tomato')) {
-                currentMainImage = 'pickingTomato';
-            } else if (clickedImageSrc.includes('work-desk')) {
-                currentMainImage = 'workDesk';
+            if (clickedImageSrc.includes('store')) {
+                currentMainImage = 'store';
+            } else if (clickedImageSrc.includes('lathe')) {
+                currentMainImage = 'lathe';
+            } else if (clickedImageSrc.includes('robot')) {
+                currentMainImage = 'robot';
             }
             updateImages();
         });
@@ -160,7 +161,6 @@
                 complete: function() {
                     $('#processingMessage').hide();
                     $submitButton.prop('disabled', false).css('opacity', '1');
-                    // adjustScale();
                 }
             });
         });
@@ -176,15 +176,15 @@
         }
 
         $.when(
-            $.get('/static/work-desk-2.html'),
-            $.get('/static/grass-cat-2.html'),
-            $.get('/static/picking-tomato-2.html')
-        ).done(function(workDesk, grassCat, pickingTomato) {
+            $.get('/static/store.html'),
+            $.get('/static/lathe.html'),
+            $.get('/static/robot.html')
+        ).done(function(store, lathe, robot) {
             // Initialize images
-            $('#vlm-token-content').html(grassCatMainContent);
-            $('#side-image-1').html(grassCatSideContent);
-            $('#side-image-2').html(pickingTomatoSideContent);
-            $('#side-image-3').html(workDeskSideContent);
+            $('#vlm-token-content').html(storeMainContent);
+            $('#side-image-1').html(storeSideContent);
+            $('#side-image-2').html(latheSideContent);
+            $('#side-image-3').html(robotSideContent);
             adjustScale();
         });
 
