@@ -4,13 +4,193 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VLM Token Visualizer</title>
+    <style>
+        :root {
+            --target-viz-width: 1000px;
+        }
+        body {
+            background-color: #181818;
+            color: white;
+            font-family: Chivo, sans-serif;
+        }
+        .vlm-token-content-outer {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            height: auto;
+        }
+        .vlm-token-content {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: var(--target-viz-width);
+            height: auto;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: top left;
+        }
+        .vlm-token-content > * {
+            max-width: 100%;
+            max-height: 100%;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .side-images {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        .side-image {
+            width: 200px;
+            height: 150px;
+            cursor: pointer;
+            border: 2px solid white;
+            overflow: hidden;
+        }
+        .side-image > * {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .upload-form {
+            margin-top: 10px;
+        }
+    </style>
 </head>
-<body style="background-color: black; color: white;">
-    <form action="/process-image/" method="post" enctype="multipart/form-data">
-        <label for="file">Try it on your own image:</label>
-        <input type="file" id="file" name="file" accept="image/*" required>
-        <br><br>
-        <button type="submit">Upload</button>
-    </form>
+<body>
+    <div class="vlm-token-content-outer">
+        <div class="vlm-token-content" id="vlm-token-content">(loading...)</div>
+    </div>
+    <div class="side-images">
+        <div class="side-image" id="side-image-1"></div>
+        <div class="side-image" id="side-image-2"></div>
+        <div class="side-image" id="side-image-3"></div>
+    </div>
+    <div class="upload-form"></div>
+        <form id="uploadForm" action="/process-image/" method="post" enctype="multipart/form-data">
+            <label for="file">Try it on your own image:</label>
+            <input type="file" id="file" name="file" accept="image/*" required>
+            <br><br>
+            <button type="submit">Upload</button>
+        </form>
+    </div>
+    <div id="processingMessage" style="display: none;">Processing...</div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script charset="utf-8" src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <script>
+    $(document).ready(function() {
+        // let grassCatMainContent, grassCatSideContent, pickingTomatoMainContent, pickingTomatoSideContent, workDeskMainContent, workDeskSideContent;
+        let latheMainContent, latheSideContent, robotMainContent, robotSideContent, storeMainContent, storeSideContent;
+        let currentMainImage = 'store';
+
+        $.get('/static/store.html', function(data) {
+            storeMainContent = data;
+            storeSideContent = '<img src="/static/store.jpeg" alt="Grocery store">';
+            $('#side-image-1').html(storeSideContent);
+        });
+
+        $.get('/static/lathe.html', function(data) {
+            latheMainContent = data;
+            latheSideContent = '<img src="/static/lathe.png" alt="Lathe">';
+            $('#side-image-2').html(latheSideContent);
+        });
+
+        $.get('/static/robot.html', function(data) {
+            robotMainContent = data;
+            robotSideContent = '<img src="/static/robot.png" alt="Robot">';
+            $('#side-image-3').html(robotSideContent);
+        });
+
+        function updateImages() {
+            if (currentMainImage === 'store') {
+                $('#vlm-token-content').html(storeMainContent);
+            } else if (currentMainImage === 'lathe') {
+                $('#vlm-token-content').html(latheMainContent);
+            } else if (currentMainImage === 'robot') {
+                $('#vlm-token-content').html(robotMainContent);
+            }
+            $('#side-image-1').html(storeSideContent);
+            $('#side-image-2').html(latheSideContent);
+            $('#side-image-3').html(robotSideContent);
+            adjustScale();
+        }
+
+        $('.side-image').on('click', function() {
+            const clickedImageSrc = $(this).find('img').attr('src');
+            if (clickedImageSrc.includes('store')) {
+                currentMainImage = 'store';
+            } else if (clickedImageSrc.includes('lathe')) {
+                currentMainImage = 'lathe';
+            } else if (clickedImageSrc.includes('robot')) {
+                currentMainImage = 'robot';
+            }
+            updateImages();
+        });
+
+        $('#uploadForm').on('submit', function(e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            var $submitButton = $(this).find('button[type="submit"]');
+
+            $.ajax({
+                url: $(this).attr('action'),
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                beforeSend: function() {
+                    $('#processingMessage').show();
+                    $('#vlm-token-content').html('Processing...');
+                    $submitButton.prop('disabled', true).css('opacity', '0.5');
+                },
+                success: function(data) {
+                    $('#vlm-token-content').html(data);
+                },
+                error: function(xhr, status, error) {
+                    $('#vlm-token-content').html('An error occurred processing your image. ' + error);
+                },
+                complete: function() {
+                    $('#processingMessage').hide();
+                    $submitButton.prop('disabled', false).css('opacity', '1');
+                }
+            });
+        });
+
+        function adjustScale() {
+            const outer = document.querySelector('.vlm-token-content-outer');
+            const inner = document.querySelector('.vlm-token-content');
+            const targetWidth = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--target-viz-width'));
+            const outerWidth = outer.clientWidth;
+            const scale = outerWidth < targetWidth ? outerWidth / targetWidth : 1;
+            inner.style.transform = `scale(${scale})`;
+            outer.style.height = `${750 * scale}px`; // Adjust height based on scale
+        }
+
+        $.when(
+            $.get('/static/store.html'),
+            $.get('/static/lathe.html'),
+            $.get('/static/robot.html')
+        ).done(function(store, lathe, robot) {
+            // Initialize images
+            $('#vlm-token-content').html(storeMainContent);
+            $('#side-image-1').html(storeSideContent);
+            $('#side-image-2').html(latheSideContent);
+            $('#side-image-3').html(robotSideContent);
+            adjustScale();
+        });
+
+        $(window).on('resize', adjustScale);
+        adjustScale(); // Call adjustScale on document ready
+    });
+    </script>
 </body>
 </html>

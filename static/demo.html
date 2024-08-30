@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            background-color: #181818;
+            color: white;
+            font-family: Chivo, sans-serif;
+        }
+
+        .outer {
+            border: 3px solid yellow;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; /* Ensure content does not overflow */
+        }
+
+        .inner {
+            border: 3px solid blue;
+            width: 600px; /* Ensure the inner div is 600px by default */
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
+            transform-origin: top left; /* Ensure scaling happens from the top left corner */
+        }
+    </style>
+</head>
+<body>
+    <h1>demo</h1>
+    <div class="outer">
+        <div class="inner">
+            <h2>words words words words word words word words wordsss</h2>
+            <img src="https://picsum.photos/200/300" alt="random image">
+            <img src="https://picsum.photos/200/300" alt="random image">
+            <img src="https://picsum.photos/200/300" alt="random image">
+        </div>
+    </div>
+
+    <script>
+        function adjustScale() {
+            const outer = document.querySelector('.outer');
+            const inner = document.querySelector('.inner');
+            const outerWidth = outer.clientWidth;
+            const scale = outerWidth < 600 ? outerWidth / 600 : 1;
+            inner.style.transform = `scale(${scale})`;
+        }
+
+        window.addEventListener('resize', adjustScale);
+        window.addEventListener('load', adjustScale);
+    </script>
+</body>
+</html>
