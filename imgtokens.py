@@ -292,7 +292,7 @@ class ImagePatchWordTokenizer:
         pixels = list(img.getdata())
         avg_color_rgb = tuple(sum(col) // len(pixels) for col in zip(*pixels))
         avg_brightness = sum(avg_color_rgb) / 3
-        text_color = (255, 255, 255) if avg_brightness < 128 else (0, 0, 0)
+        text_color = "white" if avg_brightness < 128 else "black"
 
         fig = px.imshow(img, width=img.width, height=img.height, binary_format="jpg")
         fig.update_layout(
