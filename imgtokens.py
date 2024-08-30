@@ -289,6 +289,11 @@ class ImagePatchWordTokenizer:
                 })
         df = pd.DataFrame(data)
 
+        pixels = list(img.getdata())
+        avg_color_rgb = tuple(sum(col) // len(pixels) for col in zip(*pixels))
+        avg_brightness = sum(avg_color_rgb) / 3
+        text_color = (255, 255, 255) if avg_brightness < 128 else (0, 0, 0)
+
         fig = px.imshow(img, width=img.width, height=img.height, binary_format="jpg")
         fig.update_layout(
             xaxis=dict(showgrid=False, zeroline=False, visible=False),
@@ -305,7 +310,7 @@ class ImagePatchWordTokenizer:
             hoverinfo="text",
             mode="text", 
             textposition="bottom center",
-            textfont=df["font"]
+            textfont=dict(color=text_color)
         ))
         return fig
 
