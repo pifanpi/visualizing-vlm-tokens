@@ -278,14 +278,13 @@ class ImagePatchWordTokenizer:
         height_unit = img.height / len(words)
         for i, row in enumerate(words):
             for j, word in enumerate(row):
-                text_color = self._opposing_color_near(img, j * width_unit, i * height_unit, width_unit // 2)
                 data.append({
                     # Add 0.5 to put it in the center of each cell
                     "x": (j + 0.5) * width_unit,
                     "y": (i + 0.5) * height_unit,
                     "firstword": word.first(),
                     "words": word.as_html(),
-                    "font": dict(color=text_color, size=16)
+                    "font": dict(color="black", size=16)
                 })
         df = pd.DataFrame(data)
 
