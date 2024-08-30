@@ -305,6 +305,7 @@ class ImagePatchWordTokenizer:
             hoverinfo="text",
             mode="text", 
             textposition="bottom center",
+            textfont=df["font"]
         ))
         return fig
 
