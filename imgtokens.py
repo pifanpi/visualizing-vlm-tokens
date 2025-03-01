@@ -102,7 +102,7 @@ class ImagePatchWordTokenizer:
     with plotly.
     """
 
-    def __init__(self, model_name:str = "llava-hf/llava-v1.6-vicuna-7b-hf", use_4bit:bool = True):
+    def __init__(self, model_name:str = "llava-hf/llava-v1.6-vicuna-7b-hf", revision:str = "30f8c4fe610ab808d4d3612c01456be5f725184f", use_4bit:bool = True):
         """
         :arg model_name: is the name of the model to use.  
             Options known to work are:
@@ -110,6 +110,7 @@ class ImagePatchWordTokenizer:
                 llava-hf/llava-v1.6-vicuna-7b-hf
         """
         self.model_str = model_name
+        self.revision = revision
         self.use_4bit = use_4bit
         self.sim_engine = None
         self.processor = None 
@@ -130,9 +131,9 @@ class ImagePatchWordTokenizer:
         else:
             quantization_config = None
         self.model = HackedLlavaNextReturnsImageTokens.from_pretrained(
-            self.model_str, cache_dir="", quantization_config=quantization_config, low_cpu_mem_usage=True
+            self.model_str, cache_dir="", quantization_config=quantization_config, low_cpu_mem_usage=True, revision=self.revision
         )
-        self.processor = LlavaNextProcessor.from_pretrained(self.model_str, torch_dtype=torch.float16)
+        self.processor = LlavaNextProcessor.from_pretrained(self.model_str, torch_dtype=torch.float16, revision=self.revision)
         self.processor.tokenizer.padding_side = "left"
 
         #embedding_matrix = self.model.get_output_embeddings().weight
